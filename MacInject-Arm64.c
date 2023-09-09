@@ -54,13 +54,10 @@ int pthread_create_from_mach_thread(pthread_t *thread,
 
 
 
-void kr(const int value)
-{
-    if (value != KERN_SUCCESS)
-    {
-        printf("%s%s\n", "kern error: ", mach_error_string(value));
-        exit(value);
-    }
+#define kr(value) if (value != KERN_SUCCESS)\
+{\
+    printf("kern error: %s, line %d\n", mach_error_string(value), __LINE__);\
+    exit(value);\
 }
 
 vm_address_t task_get_image_address_by_path(const task_t task,
