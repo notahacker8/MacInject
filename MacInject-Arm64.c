@@ -1,4 +1,5 @@
 
+
 //9/15/25.
 
 #include <stdio.h>
@@ -137,23 +138,15 @@ unsigned char mach_thread_code[] =
 ///Shellcode for the posix thread.
 unsigned char posix_thread_code[] =
 {
-    "\xff\x03\x01\xd1\xf4\x4f\x02\xa9\xfd\x7b\x03\xa9\xfd\xc3\x00\x91\x11\x00\x40\xf9\x00\x04\x40\xf9\x41\x00\x80\xd2\x20\x02\x3f\xd6\xe0\x03\x13\xaa\xfd\x7b\x43\xa9\xf4\x4f\x42\xa9\xff\x03\x01\x91\xc0\x03\x5f\xd6"
+    "\x11\x00\x40\xf9\x00\x04\x40\xf9\x41\x00\x80\xd2\x20\x02\x3f\xd6\xc0\x03\x5f\xd6"
 };
 
 /*
- 0x0000000000000000:  FF 03 01 D1    sub  sp, sp, #0x40
- 0x0000000000000004:  F4 4F 02 A9    stp  x20, x19, [sp, #0x20]
- 0x0000000000000008:  FD 7B 03 A9    stp  x29, x30, [sp, #0x30]
- 0x000000000000000c:  FD C3 00 91    add  x29, sp, #0x30
- 0x0000000000000010:  11 00 40 F9    ldr  x17, [x0]
- 0x0000000000000014:  00 04 40 F9    ldr  x0, [x0, #8]
- 0x0000000000000018:  41 00 80 D2    movz x1, #0x2
- 0x000000000000001c:  20 02 3F D6    blr  x17
- 0x0000000000000020:  E0 03 13 AA    mov  x0, x19
- 0x0000000000000024:  FD 7B 43 A9    ldp  x29, x30, [sp, #0x30]
- 0x0000000000000028:  F4 4F 42 A9    ldp  x20, x19, [sp, #0x20]
- 0x000000000000002c:  FF 03 01 91    add  sp, sp, #0x40
- 0x0000000000000030:  C0 03 5F D6    ret
+ 0x0000000000000000:  11 00 40 F9    ldr  x17, [x0]
+ 0x0000000000000004:  00 04 40 F9    ldr  x0, [x0, #8]
+ 0x0000000000000008:  41 00 80 D2    movz x1, #0x2
+ 0x000000000000000c:  20 02 3F D6    blr  x17
+ 0x0000000000000010:  C0 03 5F D6    ret
  */
 
 
@@ -249,5 +242,7 @@ int main(int argc, const char * argv[]) {
     }
     
     kr(thread_terminate(remote_thread));
+    kr(vm_deallocate(task, remote_stack, STACK_SIZE));
+    kr(vm_deallocate(task, remote_mach_code, MACH_CODE_SIZE));
     return 0;
 }
