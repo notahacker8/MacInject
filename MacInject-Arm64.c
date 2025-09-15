@@ -1,4 +1,5 @@
-//7/15/23.
+
+//9/15/25.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -107,6 +108,12 @@ vm_address_t task_get_image_address_by_path(const task_t task,
 }
 
 
+///TEST FUNCTION WE RUN THE THREAD ON
+void pt_f(void** bl)
+{
+    printf("dlopen @ %p\n", bl[0]);
+    printf("path : %s\n", bl[1]);
+}
 
 
 
@@ -114,20 +121,45 @@ vm_address_t task_get_image_address_by_path(const task_t task,
 
 
 
-
-
-
 ///Shellcode for the mach thread.
 unsigned char mach_thread_code[] =
 {
-    "\x80\x00\x3f\xd6" //blr x4
-    "\x00\x00\x00\x14" // b 0
+    "\x80\x00\x3f\xd6"
+    "\x20\x61\x80\xd2"
+    "\x00\x00\x00\x14"
+};
+/*
+ 0x0000000000000000:  80 00 3F D6    blr  x4
+ 0x0000000000000004:  20 61 80 D2    movz x0, #0x309
+ 0x0000000000000008:  00 00 00 14    b    #8
+ */
+
+///Shellcode for the posix thread.
+unsigned char posix_thread_code[] =
+{
+    "\xff\x03\x01\xd1\xf4\x4f\x02\xa9\xfd\x7b\x03\xa9\xfd\xc3\x00\x91\x11\x00\x40\xf9\x00\x04\x40\xf9\x41\x00\x80\xd2\x20\x02\x3f\xd6\xe0\x03\x13\xaa\xfd\x7b\x43\xa9\xf4\x4f\x42\xa9\xff\x03\x01\x91\xc0\x03\x5f\xd6"
 };
 
+/*
+ 0x0000000000000000:  FF 03 01 D1    sub  sp, sp, #0x40
+ 0x0000000000000004:  F4 4F 02 A9    stp  x20, x19, [sp, #0x20]
+ 0x0000000000000008:  FD 7B 03 A9    stp  x29, x30, [sp, #0x30]
+ 0x000000000000000c:  FD C3 00 91    add  x29, sp, #0x30
+ 0x0000000000000010:  11 00 40 F9    ldr  x17, [x0]
+ 0x0000000000000014:  00 04 40 F9    ldr  x0, [x0, #8]
+ 0x0000000000000018:  41 00 80 D2    movz x1, #0x2
+ 0x000000000000001c:  20 02 3F D6    blr  x17
+ 0x0000000000000020:  E0 03 13 AA    mov  x0, x19
+ 0x0000000000000024:  FD 7B 43 A9    ldp  x29, x30, [sp, #0x30]
+ 0x0000000000000028:  F4 4F 42 A9    ldp  x20, x19, [sp, #0x20]
+ 0x000000000000002c:  FF 03 01 91    add  sp, sp, #0x40
+ 0x0000000000000030:  C0 03 5F D6    ret
+ */
 
+
+#define POSIX_CODE_SIZE sizeof(posix_thread_code)
 #define MACH_CODE_SIZE sizeof(mach_thread_code)
 #define STACK_SIZE 0x100000
-
 
 
 
@@ -141,6 +173,8 @@ unsigned char mach_thread_code[] =
  */
 
 
+const static void* dlopen_address = (const void*)dlopen;
+
 
 int main(int argc, const char * argv[]) {
     // insert code here...
@@ -151,6 +185,7 @@ int main(int argc, const char * argv[]) {
     }
     int pid = atoi(argv[2]);
     const char* path = argv[1];
+
     task_t task;
     kr(task_for_pid(mach_task_self_, pid, &task));
     
@@ -160,40 +195,65 @@ int main(int argc, const char * argv[]) {
         exit(EXIT_FAILURE);
     }
     
+    vm_address_t remote_posix_code = 0;
     vm_address_t remote_mach_code = 0;
     vm_address_t remote_stack = 0;
     vm_address_t remote_pthread_mem = 0;
     vm_address_t remote_path = 0;
+    vm_address_t posix_param_mem = 0;
     
     kr(vm_allocate(task, &remote_mach_code, MACH_CODE_SIZE, VM_FLAGS_ANYWHERE));
+    kr(vm_allocate(task, &remote_posix_code, POSIX_CODE_SIZE, VM_FLAGS_ANYWHERE));
     kr(vm_allocate(task, &remote_stack, STACK_SIZE, VM_FLAGS_ANYWHERE));
     kr(vm_allocate(task, &remote_pthread_mem, 8, VM_FLAGS_ANYWHERE));
     kr(vm_allocate(task, &remote_path, strlen(path), VM_FLAGS_ANYWHERE));
+    kr(vm_allocate(task, &posix_param_mem, (8 * 2), VM_FLAGS_ANYWHERE));
     
     kr(vm_write(task, remote_path, (vm_address_t)path, (int)strlen(path)));
     kr(vm_write(task, remote_mach_code, (vm_address_t)mach_thread_code, MACH_CODE_SIZE));
+    kr(vm_write(task, remote_posix_code, (vm_address_t)posix_thread_code, POSIX_CODE_SIZE));
     kr(vm_protect(task, remote_mach_code, MACH_CODE_SIZE, FALSE, VM_PROT_READ|VM_PROT_EXECUTE));
+    kr(vm_protect(task, remote_posix_code, POSIX_CODE_SIZE, FALSE, VM_PROT_READ|VM_PROT_EXECUTE));
+    
+    
+    kr(vm_write(task, posix_param_mem, (vm_address_t)&dlopen_address, 8));
+    kr(vm_write(task, posix_param_mem + 8, (vm_address_t)&remote_path, 8));
 
     
-    __arm_thread_state64_t regs;
+    arm_thread_state64_t regs;
     bzero(&regs, sizeof(regs));
     regs.__pc = remote_mach_code;
-    regs.__sp = remote_stack - 128;
+    regs.__sp = remote_stack + STACK_SIZE/2;
     
     regs.__x[4] = (vm_address_t)pthread_create_from_mach_thread;
     regs.__x[0] = remote_pthread_mem;
     regs.__x[1] = 0;
-    regs.__x[2] = (vm_address_t)dlopen;
-    regs.__x[3] = remote_path;
+    regs.__x[2] = (vm_address_t)remote_posix_code;
+    regs.__x[3] = posix_param_mem;
+    
+    //printf("remote_path: %p\n", remote_path);
+    //printf("posix_param_mem: %p\n", posix_param_mem);
     
     thread_act_t remote_thread;
     kr(thread_create_running(task, ARM_THREAD_STATE64, (thread_state_t)&regs, ARM_THREAD_STATE64_COUNT, &remote_thread));
-    sleep(1);
+    
+    for (;;)
+    {
+        mach_msg_type_number_t sc = ARM_THREAD_STATE64_COUNT;
+        kr(thread_get_state(remote_thread, ARM_THREAD_STATE64, (thread_state_t)(&regs), &sc));
+        if (regs.__x[0] == 777)
+        {
+            printf("FINISHED INJECTING\n");
+            break;
+        }
+    }
+    
     kr(thread_terminate(remote_thread));
     kr(vm_deallocate(task, remote_stack, STACK_SIZE));
     kr(vm_deallocate(task, remote_mach_code, MACH_CODE_SIZE));
+    kr(vm_deallocate(task, remote_posix_code, POSIX_CODE_SIZE));
     kr(vm_deallocate(task, remote_path, strlen(path)));
     kr(vm_deallocate(task, remote_pthread_mem, 8));
+    kr(vm_deallocate(task, posix_param_mem, 16));
     return 0;
 }
-
