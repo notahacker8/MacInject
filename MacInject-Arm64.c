@@ -249,11 +249,5 @@ int main(int argc, const char * argv[]) {
     }
     
     kr(thread_terminate(remote_thread));
-    kr(vm_deallocate(task, remote_stack, STACK_SIZE));
-    kr(vm_deallocate(task, remote_mach_code, MACH_CODE_SIZE));
-    kr(vm_deallocate(task, remote_posix_code, POSIX_CODE_SIZE));
-    kr(vm_deallocate(task, remote_path, strlen(path)));
-    kr(vm_deallocate(task, remote_pthread_mem, 8));
-    kr(vm_deallocate(task, posix_param_mem, 16));
     return 0;
 }
