@@ -1,5 +1,6 @@
 
 
+
 //9/15/25.
 
 #include <stdio.h>
@@ -138,15 +139,20 @@ unsigned char mach_thread_code[] =
 ///Shellcode for the posix thread.
 unsigned char posix_thread_code[] =
 {
-    "\x11\x00\x40\xf9\x00\x04\x40\xf9\x41\x00\x80\xd2\x20\x02\x3f\xd6\xc0\x03\x5f\xd6"
+    "\xff\x83\x00\xd1\xfd\x7b\x01\xa9\xfd\x43\x00\x91\x11\x00\x40\xf9\x00\x04\x40\xf9\x41\x00\x80\xd2\x20\x02\x3f\xd6\xfd\x7b\x41\xa9\xff\x83\x00\x91\xc0\x03\x5f\xd6"
 };
 
 /*
- 0x0000000000000000:  11 00 40 F9    ldr  x17, [x0]
- 0x0000000000000004:  00 04 40 F9    ldr  x0, [x0, #8]
- 0x0000000000000008:  41 00 80 D2    movz x1, #0x2
- 0x000000000000000c:  20 02 3F D6    blr  x17
- 0x0000000000000010:  C0 03 5F D6    ret
+ 0x0000000000000000:  FF 83 00 D1    sub  sp, sp, #0x20
+ 0x0000000000000004:  FD 7B 01 A9    stp  x29, x30, [sp, #0x10]
+ 0x0000000000000008:  FD 43 00 91    add  x29, sp, #0x10
+ 0x000000000000000c:  11 00 40 F9    ldr  x17, [x0]
+ 0x0000000000000010:  00 04 40 F9    ldr  x0, [x0, #8]
+ 0x0000000000000014:  41 00 80 D2    movz x1, #0x2
+ 0x0000000000000018:  20 02 3F D6    blr  x17
+ 0x000000000000001c:  FD 7B 41 A9    ldp  x29, x30, [sp, #0x10]
+ 0x0000000000000020:  FF 83 00 91    add  sp, sp, #0x20
+ 0x0000000000000024:  C0 03 5F D6    ret
  */
 
 
