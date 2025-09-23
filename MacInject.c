@@ -265,16 +265,7 @@ void inject(const pid_t process_id,
     thread_act_t thread;
     kr(thread_create_running(task, state, (thread_state_t)(&regs), state_count, &thread));
     
-    //Repeat check if a certain register has a certain value.
-    for (;;)
-    {
-        mach_msg_type_number_t sc = state_count;
-        kr(thread_get_state(thread, state, (thread_state_t)(&regs), &sc));
-        if (regs.__rax == 777)
-        {
-            break;
-        }
-    }
+    sleep(1);
     
     ///Terminate the thread.
     kr(thread_suspend(thread));
