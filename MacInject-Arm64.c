@@ -229,18 +229,7 @@ int main(int argc, const char * argv[]) {
     
     thread_act_t remote_thread;
     kr(thread_create_running(task, ARM_THREAD_STATE64, (thread_state_t)&regs, ARM_THREAD_STATE64_COUNT, &remote_thread));
-    
-    for (;;)
-    {
-        mach_msg_type_number_t sc = ARM_THREAD_STATE64_COUNT;
-        kr(thread_get_state(remote_thread, ARM_THREAD_STATE64, (thread_state_t)(&regs), &sc));
-        if (regs.__x[0] == 777)
-        {
-            printf("FINISHED INJECTING\n");
-            break;
-        }
-    }
-    
+    sleep(1);
     kr(thread_terminate(remote_thread));
     kr(vm_deallocate(task, remote_stack, STACK_SIZE));
     kr(vm_deallocate(task, remote_mach_code, MACH_CODE_SIZE));
